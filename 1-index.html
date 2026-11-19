@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XgenCloud Console (not live)</title>
+<style>
+:root{--bg:#0d1014;--panel:#14171c;--line:#242a33;--text:#e8eaed;--mute:#8b93a1;--amber:#f5b942;--ok:#5fbf8f;--bad:#e5604f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.3px}.brand b{color:var(--amber)}
+.tag{font-size:12px;color:var(--amber);border:1px solid var(--amber);padding:2px 8px;border-radius:99px}
+main{max-width:980px;margin:0 auto;padding:24px;display:grid;gap:20px}
+.banner{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--amber);padding:12px 16px;border-radius:6px;color:var(--mute)}
+.banner strong{color:var(--text)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px}
+h2{margin:0 0 12px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.stat{border:1px solid var(--line);border-radius:6px;padding:12px}.stat small{color:var(--mute);display:block}.stat span{font-size:20px;font-weight:600}
+label{display:block;color:var(--mute);font-size:13px;margin:10px 0 4px}
+input,select{width:100%;padding:10px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:6px;font:inherit}
+button{background:var(--amber);color:#14171c;border:0;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;margin-top:14px}
+button:disabled{background:var(--line);color:var(--mute);cursor:not-allowed}
+.row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.pill{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.no{color:var(--bad);border-color:var(--bad)}
+.hint{color:var(--mute);font-size:13px}@media(max-width:560px){header{padding:12px 14px}main{padding:14px}.tag{font-size:10px}.grid{grid-template-columns:1fr 1fr}.row{gap:8px}button{width:100%}}
+</style></head><body>
+<header><div class="brand"><b>Xgen</b>Cloud Console</div><span class="tag">STAGING PREVIEW, NOT LIVE</span></header>
+<main>
+<div class="banner"><strong>Not live.</strong> This is the dashboard interface only. No backend is connected, so sign-in and container requests are disabled. Nothing is running for any customer. The numbers below are the requested plan, not measured limits.</div>
+
+<section><h2>Sign in</h2>
+<label>Email</label><input id="email" type="email" placeholder="you@example.com" autocomplete="username">
+<label>Password</label><input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+<button id="login" disabled>Sign in</button><p id="msg" class="hint" role="status"></p>
+<p class="hint">Sign-in will use the platform's own accounts through an HTTPS API. No passwords or server details are stored in this page.</p></section>
+
+<section><h2>Your bot hosting</h2>
+<div class="grid">
+<div class="stat"><small>Memory (requested)</small><span>360 MB</span></div>
+<div class="stat"><small>CPU (requested)</small><span>30% shared</span></div>
+<div class="stat"><small>Status</small><span id="status">Not created</span></div>
+<div class="stat"><small>Enforcement</small><span>Unverified</span></div></div>
+<label>Bot runtime</label><select id="rt"><option value="python">Python</option><option value="node">Node.js</option></select>
+<label>Container name (3-31 chars: a-z, 0-9, -)</label><input id="cname" placeholder="my-bot">
+<button id="create" disabled>Request container</button> <button id="logout" disabled>Sign out</button><p id="cmsg" class="hint" role="status"></p></section>
+
+<section><h2>Backend checks</h2>
+<div class="row"><span>Stable HTTPS API endpoint (production)</span><span class="pill no" id="apipill">not connected</span></div>
+<div class="row"><span>Container runtime on the VPS</span><span class="pill">unknown</span></div>
+<div class="row"><span>CPU share enforcement</span><span class="pill">unknown</span></div>
+<div class="row"><span>Customer sign-in</span><span class="pill no">not available yet</span></div></section>
+</main>
+<script src="config.js"></script>
+<script>
+const API=(window.XGEN_API||"").replace(/\/$/,"");let token=null;
+const $=i=>document.getElementById(i);
+const LABEL={queued_provisioning_disabled:"Requested, provisioning off"};
+async function api(m,p,b){const r=await fetch(API+p,{method:m,headers:Object.assign({"Content-Type":"application/json"},token?{Authorization:"Bearer "+token}:{}),body:b?JSON.stringify(b):undefined});let j={};try{j=await r.json()}catch(e){}return{s:r.status,j}}
+function ok(t){$("apipill").textContent=t;$("apipill").className="pill ok"}
+document.addEventListener("DOMContentLoaded",()=>{});
+async function doLogout(){await api("POST","/api/logout",{});token=null;$("create").disabled=true;$("logout").disabled=true;$("msg").textContent="Signed out."}
+async function refresh(){const r=await api("GET","/api/containers");if(r.s!==200)return;const c=r.j.containers[0];
+ if(c){$("status").textContent=LABEL[c.status]||c.status;$("create").disabled=true;$("cmsg").textContent="Container request "+c.name+" ("+c.runtime+") saved. Nothing is running yet."}}
+$("login").onclick=async()=>{$("msg").textContent="";if(!API){$("msg").textContent="No API configured for this preview.";return}
+ try{const r=await api("POST","/api/login",{email:$("email").value,password:$("pw").value});$("pw").value="";
+ if(r.s===200){token=r.j.token;($("apipill").textContent="local fixture only",$("apipill").className="pill");$("msg").textContent="Signed in.";$("create").disabled=false;$("logout").disabled=false;refresh()}
+ else if(r.s===429)$("msg").textContent="Too many attempts. Wait a few minutes.";else $("msg").textContent="Wrong email or password."}
+ catch(e){$("msg").textContent="Cannot reach the API."}};
+$("create").onclick=async()=>{const r=await api("POST","/api/containers",{name:$("cname").value,runtime:$("rt").value});
+ if(r.s===202)refresh();else $("cmsg").textContent=({400:"Use 3-31 characters: a-z, 0-9, -",409:"You already have a container, or the name is taken."})[r.s]||"Request failed."};
+$("logout").onclick=doLogout;
+if(!API){$("msg").textContent="Backend not connected. Sign-in is disabled.";$("email").disabled=true;$("pw").disabled=true;$("login").disabled=true}
+</script></body></html>
