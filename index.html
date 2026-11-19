@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>XgenCloud Console (not live)</title>
+<title>XgenCloud Console</title>
 <style>
 :root{--bg:#0d1014;--panel:#14171c;--line:#242a33;--text:#e8eaed;--mute:#8b93a1;--amber:#f5b942;--ok:#5fbf8f;--bad:#e5604f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
@@ -22,51 +22,128 @@ button:disabled{background:var(--line);color:var(--mute);cursor:not-allowed}
 .pill{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
 .pill.ok{color:var(--ok);border-color:var(--ok)}.pill.no{color:var(--bad);border-color:var(--bad)}
 .hint{color:var(--mute);font-size:13px}@media(max-width:560px){header{padding:12px 14px}main{padding:14px}.tag{font-size:10px}.grid{grid-template-columns:1fr 1fr}.row{gap:8px}button{width:100%}}
+[hidden]{display:none!important}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.two{grid-template-columns:1fr}}
+.cred{background:var(--bg);border:1px dashed var(--amber);border-radius:6px;padding:10px;margin-top:10px;word-break:break-all;font-family:ui-monospace,Consolas,monospace}
+button.sec{background:transparent;color:var(--text);border:1px solid var(--line)}
+.row span:first-child{word-break:break-all;margin-right:8px}.acts{display:flex;gap:6px;flex-shrink:0}.acts button{margin:0;padding:4px 10px;font-size:13px}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:8px 6px;border-top:1px solid var(--line);font-size:14px}th{color:var(--mute);font-weight:500}
 </style></head><body>
-<header><div class="brand"><b>Xgen</b>Cloud Console</div><span class="tag">STAGING PREVIEW, NOT LIVE</span></header>
+<header><div class="brand"><b>Xgen</b>Cloud Console</div><span class="tag" id="who">Signed out</span></header>
 <main>
-<div class="banner"><strong>Not live.</strong> This is the dashboard interface only. No backend is connected, so sign-in and container requests are disabled. Nothing is running for any customer. The numbers below are the requested plan, not measured limits.</div>
+<div id="status" class="banner" role="status"></div>
 
-<section><h2>Sign in</h2>
-<label>Email</label><input id="email" type="email" placeholder="you@example.com" autocomplete="username">
-<label>Password</label><input id="pw" type="password" placeholder="Password" autocomplete="current-password">
-<button id="login" disabled>Sign in</button><p id="msg" class="hint" role="status"></p>
-<p class="hint">Sign-in will use the platform's own accounts through an HTTPS API. No passwords or server details are stored in this page.</p></section>
+<section id="loginbox"><h2>Sign in</h2>
+<form id="lf"><label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+<label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+<button id="login" type="submit">Sign in</button></form><p id="msg" class="hint" role="status"></p>
+<p class="hint">Accounts are created by the administrator. Everything below is hidden until you sign in.</p></section>
 
-<section><h2>Your bot hosting</h2>
+<section id="chg" hidden><h2>Change your password</h2><p class="hint" id="chgnote">Choose a new password (10 to 200 characters) before you can upload files.</p>
+<form id="cf"><label for="op">Current password</label><input id="op" type="password" autocomplete="current-password" required>
+<label for="np">New password</label><input id="np" type="password" autocomplete="new-password" minlength="10" required>
+<button type="submit">Change password</button></form><p id="cpmsg" class="hint" role="status"></p></section>
+
+<section id="adm" hidden><h2>Administrator: users</h2>
+<form id="af" class="two"><div><label for="ae">User email</label><input id="ae" type="email" required></div>
+<div><label for="ad">Access days (1 to 365)</label><input id="ad" type="number" min="1" max="365" value="30" required></div>
+<div><button type="submit">Create user</button> <button type="button" class="sec" id="aext">Extend existing</button></div></form>
+<div id="cred" class="cred" hidden></div><p id="amsg" class="hint" role="status"></p>
+<table><thead><tr><th>Email</th><th>Role</th><th>Expires</th><th></th></tr></thead><tbody id="ulist"></tbody></table></section>
+
+<section id="dash" hidden><h2>Your bot hosting</h2>
 <div class="grid">
-<div class="stat"><small>Memory (requested)</small><span>360 MB</span></div>
-<div class="stat"><small>CPU (requested)</small><span>30% shared</span></div>
-<div class="stat"><small>Status</small><span id="status">Not created</span></div>
-<div class="stat"><small>Enforcement</small><span>Unverified</span></div></div>
-<label>Bot runtime</label><select id="rt"><option value="python">Python</option><option value="node">Node.js</option></select>
-<label>Container name (3-31 chars: a-z, 0-9, -)</label><input id="cname" placeholder="my-bot">
-<button id="create" disabled>Request container</button> <button id="logout" disabled>Sign out</button><p id="cmsg" class="hint" role="status"></p></section>
+<div class="stat"><small>Memory limit</small><span id="pm">360 MB</span></div>
+<div class="stat"><small>CPU limit</small><span id="pc">30%</span></div>
+<div class="stat"><small>Container</small><span id="cs">None</span></div>
+<div class="stat"><small>Access until</small><span id="exp" style="font-size:15px">-</span></div></div>
+<p class="hint">Memory is 360,000,000 bytes. CPU is capped at 30% of one core while the container runs. Outbound internet is limited to HTTPS (port 443). Your files are never run on the host, only inside your container.</p>
+<label for="rt">Bot runtime</label><select id="rt"><option value="python">Python</option><option value="node">Node.js</option></select>
+<label for="cname">Container name (3-31 chars: a-z, 0-9, -)</label><input id="cname" placeholder="my-bot">
+<button id="create">Create container</button> <button id="logout" class="sec">Sign out</button><p id="cmsg" class="hint" role="status"></p></section>
 
-<section><h2>Backend checks</h2>
-<div class="row"><span>Stable HTTPS API endpoint (production)</span><span class="pill no" id="apipill">not connected</span></div>
-<div class="row"><span>Container runtime on the VPS</span><span class="pill">unknown</span></div>
-<div class="row"><span>CPU share enforcement</span><span class="pill">unknown</span></div>
-<div class="row"><span>Customer sign-in</span><span class="pill no">not available yet</span></div></section>
+<section id="appsec" hidden><h2>Apps to run</h2>
+<p class="hint">Pick which uploaded file starts each app (up to 5 per container; all share the one 360 MB / 30% budget). Python runtime runs .py files, Node.js runs .js/.mjs/.cjs. If you skip this and upload bot.py / main.py / app.py / index.py (Python) or index.js / bot.js / main.js / app.js (Node), that file is started automatically as one app. Crashed apps restart up to 5 times per 10 minutes.</p>
+<div id="applist"></div><button type="button" class="sec" id="addapp">Add app</button> <button type="button" id="saveapps">Save apps</button><p id="appmsg" class="hint" role="status"></p></section>
+
+<section id="opsec" hidden><h2>Dependencies and restart</h2>
+<button type="button" id="depbtn">Install dependencies</button> <button type="button" class="sec" id="rsbtn">Restart container</button>
+<p id="opmsg" class="hint" role="status"></p><pre id="oplog" class="cred" hidden style="white-space:pre-wrap"></pre></section>
+
+<section id="files" hidden><h2>Bot files</h2>
+<p class="hint">Upload your bot files (up to 50 MB each). Up to 10 folder levels. </p>
+<label for="fp">Folder inside your bot (optional, e.g. cogs)</label><input id="fp" placeholder="leave empty for top level">
+<label for="fi">Files</label><input id="fi" type="file" multiple>
+<label for="fd">Or a whole folder (keeps its structure, up to 10 levels, 5000 files)</label><input id="fd" type="file" webkitdirectory multiple>
+<p class="hint"><strong>Dependencies:</strong> upload <code>requirements.txt</code> (Python) or <code>package.json</code> (Node.js) at the top level, then press Install dependencies below. The install runs in an isolated container with the same 360 MB / 30% limits (no packages ever run on the host). While it runs, your container is stopped, then restarted when it finishes. Max 500 MB of installed packages, 15 minutes. File and folder names: letters, digits and . _ @ + ~ - (up to 100 characters).</p>
+<button id="up">Upload</button><p id="fmsg" class="hint" role="status"></p>
+<div id="flist"></div><p class="hint" id="quota"></p></section>
 </main>
 <script src="config.js"></script>
 <script>
-const API=(window.XGEN_API||"").replace(/\/$/,"");let token=null;
+const API=(window.XGEN_API||"").replace(/\/$/,"");let token=null,me=null;
 const $=i=>document.getElementById(i);
-const LABEL={queued_provisioning_disabled:"Requested, provisioning off"};
-async function api(m,p,b){const r=await fetch(API+p,{method:m,headers:Object.assign({"Content-Type":"application/json"},token?{Authorization:"Bearer "+token}:{}),body:b?JSON.stringify(b):undefined});let j={};try{j=await r.json()}catch(e){}return{s:r.status,j}}
-function ok(t){$("apipill").textContent=t;$("apipill").className="pill ok"}
-document.addEventListener("DOMContentLoaded",()=>{});
-async function doLogout(){await api("POST","/api/logout",{});token=null;$("create").disabled=true;$("logout").disabled=true;$("msg").textContent="Signed out."}
-async function refresh(){const r=await api("GET","/api/containers");if(r.s!==200)return;const c=r.j.containers[0];
- if(c){$("status").textContent=LABEL[c.status]||c.status;$("create").disabled=true;$("cmsg").textContent="Container request "+c.name+" ("+c.runtime+") saved. Nothing is running yet."}}
-$("login").onclick=async()=>{$("msg").textContent="";if(!API){$("msg").textContent="No API configured for this preview.";return}
+const ERR={invalid_credentials:"Wrong email or password.",expired:"This account has expired or is disabled.",too_many_attempts:"Too many attempts. Wait a few minutes.",exists:"That user already exists.",not_found:"Not found.",invalid_input:"Check the input.",weak_or_same:"New password must be 10 to 200 characters and different.",wrong_password:"Current password is wrong.",forbidden:"Not allowed.",invalid_name:"Invalid file or folder name.",too_large:"File too large (50 MB max).",quota:"Storage quota reached.",too_many_files:"Too many files.",must_change_password:"Change your password first."};
+async function api(m,p,b,raw){const h={};if(token)h.Authorization="Bearer "+token;let body;if(raw!==undefined){body=raw;h["Content-Type"]="application/octet-stream"}else if(b){body=JSON.stringify(b);h["Content-Type"]="application/json"}
+ const r=await fetch(API+p,{method:m,headers:h,body});let j={};try{j=await r.json()}catch(e){}return{s:r.status,j}}
+const em=j=>ERR[j.error]||"Request failed.";
+const fmt=t=>t?new Date(t*1000).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}):"-";
+const mb=n=>(n/1e6).toFixed(1)+" MB";
+function show(){banner();const inn=!!me,adm=inn&&me.role==="admin",must=inn&&me.must_change;
+ $("loginbox").hidden=inn;$("chg").hidden=!must;$("adm").hidden=!adm||must;$("dash").hidden=!inn||must;$("files").hidden=!inn||must;$("appsec").hidden=!inn||must;$("opsec").hidden=!inn||must;
+ $("who").textContent=inn?me.email:"Signed out";}
+function banner(){const b=$("status");b.textContent="";const st=document.createElement("strong");
+ if(!API){st.textContent="Not available. ";b.append(st,"The backend is not connected to this page, so sign-in is disabled.")}
+ else if(!me){st.textContent="Sign in required. ";b.append(st,"Nothing is shown until you sign in.")}
+ else if(me.must_change){st.textContent="Password change required. ";b.append(st,"Set a new password to continue.")}
+ else{st.textContent="Signed in. ";b.append(st,"Limits shown are the plan limits set on the platform.")}}
+async function loadMe(){const r=await api("GET","/api/me");if(r.s!==200){token=null;me=null;show();return false}me=r.j;show();
+ if(me.must_change)return true;$("exp").textContent=me.role==="admin"?"No expiry":fmt(me.expires);await loadF();await Promise.all([loadC(),loadApps(),me.role==="admin"?loadU():0]);return true}
+let poll=null;
+function showOp(op){const m=$("opmsg"),l=$("oplog");if(!op){m.textContent="No install or restart run yet.";l.hidden=true;return}
+ const what=op.kind==="deps"?"Dependency install":"Restart";const st={pending:"queued (starts within about 15 seconds)",running:"running",done:"finished",failed:"failed"}[op.state]||op.state;
+ m.textContent=what+": "+st+".";l.hidden=!op.log;l.textContent=op.log||"";
+ if(op.state==="pending"||op.state==="running"){if(!poll)poll=setInterval(()=>{loadC()},5000)}else if(poll){clearInterval(poll);poll=null}}
+async function startOp(a){const r=await api("POST","/api/containers",{action:a,runtime:$("rt").value});
+ if(r.s===202)loadC();else $("opmsg").textContent=r.j.error==="no_dependency_file"?"Upload "+r.j.need+" first.":r.j.error==="busy"?"Another install or restart is still running.":r.j.error==="no_container"?"Create the container first.":em(r.j)}
+$("depbtn").onclick=()=>startOp("deps");$("rsbtn").onclick=()=>startOp("restart");
+async function loadC(){const r=await api("GET","/api/containers");if(r.s!==200)return;showOp(r.j.op);const c=r.j.containers[0];
+ if(c){$("cs").textContent=c.status;$("create").disabled=true;$("cmsg").textContent="Container "+c.name+" ("+c.runtime+"): "+c.status+". Refresh to update."}else{$("cs").textContent="None";$("create").disabled=false}}
+async function loadF(){const r=await api("GET","/api/files");if(r.s!==200)return;const el=$("flist");el.textContent="";FILES=r.j.files.map(f=>f.name);
+ for(const f of r.j.files){const d=document.createElement("div");d.className="row";const a=document.createElement("span");a.textContent=f.name+" ("+f.bytes+" B)";const w=document.createElement("div");w.className="acts";const b=document.createElement("button");b.className="sec";b.textContent="Delete";b.onclick=async()=>{const x=await api("DELETE","/api/files/"+f.name.split("/").map(encodeURIComponent).join("/"));if(x.s===200)loadF();else $("fmsg").textContent=em(x.j)};w.appendChild(b);d.append(a,w);el.appendChild(d)}
+ $("quota").textContent="Used "+mb(r.j.used_bytes)+" of "+mb(r.j.limit_bytes)+".";}
+async function loadU(){const r=await api("GET","/api/admin/users");if(r.s!==200)return;const t=$("ulist");t.textContent="";
+ for(const u of r.j.users){const tr=document.createElement("tr");for(const v of [u.email,u.role,u.role==="admin"?"-":fmt(u.expires)+(u.disabled?" (disabled)":"")]){const td=document.createElement("td");td.textContent=v;tr.appendChild(td)}
+  const td=document.createElement("td");if(u.role!=="admin"){const b=document.createElement("button");b.className="sec";b.textContent="Disable";b.onclick=async()=>{const x=await api("POST","/api/admin/disable",{email:u.email,days:1});if(x.s===200)loadU();else $("amsg").textContent=em(x.j)};td.appendChild(b)}tr.appendChild(td);t.appendChild(tr)}}
+$("lf").onsubmit=async e=>{e.preventDefault();$("msg").textContent="";if(!API)return;
  try{const r=await api("POST","/api/login",{email:$("email").value,password:$("pw").value});$("pw").value="";
- if(r.s===200){token=r.j.token;($("apipill").textContent="local fixture only",$("apipill").className="pill");$("msg").textContent="Signed in.";$("create").disabled=false;$("logout").disabled=false;refresh()}
- else if(r.s===429)$("msg").textContent="Too many attempts. Wait a few minutes.";else $("msg").textContent="Wrong email or password."}
- catch(e){$("msg").textContent="Cannot reach the API."}};
+ if(r.s===200){token=r.j.token;await loadMe()}else if(r.s===429)$("msg").textContent=ERR.too_many_attempts;else if(r.s===403)$("msg").textContent=ERR.expired;else $("msg").textContent=ERR.invalid_credentials}
+ catch(x){$("msg").textContent="Cannot reach the API."}};
+$("cf").onsubmit=async e=>{e.preventDefault();const r=await api("POST","/api/password",{old:$("op").value,new:$("np").value});$("op").value="";$("np").value="";
+ if(r.s===200){$("cpmsg").textContent="Password changed.";await loadMe()}else $("cpmsg").textContent=em(r.j)};
+$("af").onsubmit=async e=>{e.preventDefault();const r=await api("POST","/api/admin/users",{email:$("ae").value,days:+$("ad").value});const c=$("cred");
+ if(r.s===201){c.hidden=false;c.textContent="Temporary password for "+r.j.email+" (shown once, give it to the user privately): "+r.j.temp_password;$("amsg").textContent="User created. Expires "+fmt(r.j.expires)+".";$("ae").value="";loadU()}else{c.hidden=true;$("amsg").textContent=em(r.j)}};
+$("aext").onclick=async()=>{const r=await api("POST","/api/admin/extend",{email:$("ae").value,days:+$("ad").value});$("cred").hidden=true;
+ if(r.s===200){$("amsg").textContent="Extended to "+fmt(r.j.expires)+".";loadU()}else $("amsg").textContent=em(r.j)};
 $("create").onclick=async()=>{const r=await api("POST","/api/containers",{name:$("cname").value,runtime:$("rt").value});
- if(r.s===202)refresh();else $("cmsg").textContent=({400:"Use 3-31 characters: a-z, 0-9, -",409:"You already have a container, or the name is taken."})[r.s]||"Request failed."};
-$("logout").onclick=doLogout;
+ if(r.s===202||r.s===201||r.s===200){loadC();loadApps()}else $("cmsg").textContent=r.j.error==="no_entrypoint"?"Upload your bot files and save at least one app first (or upload bot.py / main.py / index.js).":({400:"Use 3-31 characters: a-z, 0-9, -",409:"You already have a container, or the name is taken."})[r.s]||em(r.j)};
+$("up").onclick=async()=>{const fs=[...$("fi").files,...$("fd").files];if(!fs.length){$("fmsg").textContent="Choose files first.";return}
+ const pre=$("fp").value.trim().replace(/^\/+|\/+$/g,"");let ok=0;
+ for(const f of fs){const name=(pre?pre+"/":"")+(f.webkitRelativePath||f.name);$("fmsg").textContent="Uploading "+name+"...";
+  const r=await api("PUT","/api/files/"+name.split("/").map(encodeURIComponent).join("/"),null,f);if(r.s!==200){$("fmsg").textContent=f.name+": "+em(r.j);await loadF();return}ok++}
+ $("fmsg").textContent=ok+" file(s) uploaded.";$("fi").value="";$("fd").value="";await loadF();loadApps()};
+let FILES=[];
+function addRow(n,f){const d=document.createElement("div");d.className="row";const nm=document.createElement("input");nm.placeholder="app name (a-z, 0-9, -)";nm.value=n||"";nm.style.maxWidth="40%";nm.dataset.k="n";
+ const sel=document.createElement("select");sel.dataset.k="f";const rt=$("rt").value;const ok=x=>rt==="python"?/\.py$/.test(x):/\.(m|c)?js$/.test(x)&&!x.startsWith("node_modules/");
+ for(const x of FILES.filter(ok).filter(x=>!x.startsWith("libs/")&&!x.startsWith("node_modules/"))){const o=document.createElement("option");o.value=x;o.textContent=x;if(x===f)o.selected=true;sel.appendChild(o)}
+ const b=document.createElement("button");b.className="sec";b.type="button";b.textContent="Remove";b.style.margin="0";b.onclick=()=>d.remove();d.append(nm,sel,b);$("applist").appendChild(d)}
+async function loadApps(){const r=await api("GET","/api/apps");$("applist").textContent="";if(r.s===200)for(const a of r.j.apps)addRow(a.name,a.file)}
+$("addapp").onclick=()=>{if($("applist").children.length>=5){$("appmsg").textContent="Up to 5 apps.";return}addRow("app"+($("applist").children.length+1),"")};
+$("rt").onchange=loadApps;
+$("saveapps").onclick=async()=>{const apps=[...$("applist").children].map(d=>({name:d.querySelector("[data-k=n]").value.trim(),file:d.querySelector("[data-k=f]").value}));
+ const r=await api("POST","/api/apps",{runtime:$("rt").value,apps});$("appmsg").textContent=r.s===200?"Saved "+r.j.apps.length+" app(s). They start when the container is created.":({invalid_apps:"Check names (a-z, 0-9, -, unique), and pick a file matching the runtime.",file_missing:"A chosen file is not uploaded."})[r.j.error]||em(r.j)};
+$("logout").onclick=async()=>{await api("POST","/api/logout",{});token=null;me=null;$("msg").textContent="Signed out.";show()};
+banner();show();
 if(!API){$("msg").textContent="Backend not connected. Sign-in is disabled.";$("email").disabled=true;$("pw").disabled=true;$("login").disabled=true}
 </script></body></html>
